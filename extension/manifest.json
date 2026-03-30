@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Claude Usage Monitor",
+  "version": "1.0.0",
+  "description": "Monitor Claude.ai message usage in your macOS menu bar",
+  "permissions": [
+    "storage",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "http://127.0.0.1:4480/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/settings/usage*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    },
+    "default_title": "Claude Usage Monitor"
+  }
+}

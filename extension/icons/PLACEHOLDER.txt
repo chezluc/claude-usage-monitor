@@ -1,0 +1,11 @@
+Icon placeholder — create the following PNG files in this directory:
+  icon16.png   — 16x16 pixels
+  icon48.png   — 48x48 pixels
+  icon128.png  — 128x128 pixels
+
+Suggested design: A simple "C" or chat-bubble icon in Anthropic orange (#D4570C)
+on a transparent background. Tools like Figma, Sketch, or GIMP can produce these
+at the required sizes.
+
+Until real icons are added Chrome will show a generic puzzle-piece icon for the
+extension but everything will function normally.
