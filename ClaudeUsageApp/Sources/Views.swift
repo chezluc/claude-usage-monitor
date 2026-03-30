@@ -62,6 +62,7 @@ struct UsagePopoverView: View {
             plansSection
             refreshControls
             openButton
+            quitButton
         }
         .padding(18)
         .frame(width: 320, alignment: .topLeading)
@@ -156,6 +157,23 @@ struct UsagePopoverView: View {
             }
             .pickerStyle(.segmented)
         }
+    }
+
+    private var quitButton: some View {
+        Button {
+            NSApplication.shared.terminate(nil)
+        } label: {
+            HStack {
+                Text("Quit")
+                Spacer()
+                Image(systemName: "xmark.circle")
+            }
+            .font(.system(size: 13, weight: .medium, design: .rounded))
+            .foregroundStyle(Color.white.opacity(0.5))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.plain)
     }
 
     private var openButton: some View {

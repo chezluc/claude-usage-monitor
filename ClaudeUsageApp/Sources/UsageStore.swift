@@ -19,12 +19,11 @@ final class UsageStore: ObservableObject {
     private var httpListener: NWListener?
 
     private static let refreshDefaultsKey = "refreshIntervalMinutes"
-    // Cache file stored in Application Support (user-only directory)
     private static nonisolated(unsafe) let cacheURL: URL = {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("ClaudeUsageMonitor")
-        try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
-        return appSupport.appendingPathComponent("usage_cache.json")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("usage_cache.json")
     }()
     private static nonisolated(unsafe) let httpPort: UInt16 = 4480
 
@@ -111,47 +110,46 @@ final class UsageStore: ObservableObject {
     private nonisolated func handleConnection(_ connection: NWConnection) {
         connection.start(queue: .global(qos: .utility))
 
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
-            defer {
-                let responseBody = #"{"ok":true}"#
-                // Only allow requests from chrome-extension or localhost origins
-                let http = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\nAccess-Control-Allow-Methods: GET,POST,OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nContent-Length: \(responseBody.count)\r\nConnection: close\r\n\r\n\(responseBody)"
-                connection.send(content: http.data(using: .utf8), completion: .contentProcessed { _ in
-                    connection.cancel()
-                })
-            }
+        // Read once — HTTP requests from localhost extensions fit in one read
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, _ in
+            self.processRequest(data ?? Data(), connection: connection)
+        }
+    }
 
-            guard let data, !data.isEmpty else { return }
+    private nonisolated func processRequest(_ data: Data, connection: NWConnection) {
+        let responseBody = #"{"ok":true}"#
+        let http = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\nAccess-Control-Allow-Methods: GET,POST,OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nContent-Length: \(responseBody.count)\r\nConnection: close\r\n\r\n\(responseBody)"
 
-            let raw = String(data: data, encoding: .utf8) ?? ""
+        defer {
+            connection.send(content: http.data(using: .utf8), completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+        }
 
-            if raw.hasPrefix("OPTIONS") { return }
-            if raw.hasPrefix("GET /health") { return }
+        guard !data.isEmpty else { return }
+        let raw = String(data: data, encoding: .utf8) ?? ""
 
-            // Extract JSON body
-            guard let bodyRange = raw.range(of: "\r\n\r\n") else { return }
-            let bodyStr = String(raw[bodyRange.upperBound...])
-            guard let bodyData = bodyStr.data(using: .utf8) else { return }
+        if raw.hasPrefix("OPTIONS") || raw.hasPrefix("GET") { return }
 
-            // Validate: must decode as UsageSnapshot before writing
-            guard let decoded = try? JSONDecoder().decode(UsageSnapshot.self, from: bodyData) else {
-                return
-            }
+        guard let bodyRange = raw.range(of: "\r\n\r\n") else { return }
+        let bodyStr = String(raw[bodyRange.upperBound...])
+        guard let bodyData = bodyStr.data(using: .utf8) else { return }
 
-            // Write validated data to cache
-            do {
-                try bodyData.write(to: Self.cacheURL, options: [.atomic])
-                // Set restrictive permissions (owner read/write only)
-                try FileManager.default.setAttributes(
-                    [.posixPermissions: 0o600],
-                    ofItemAtPath: Self.cacheURL.path
-                )
-            } catch {
-                print("[UsageStore] Cache write error: \(error)")
-            }
+        guard let decoded = try? JSONDecoder().decode(UsageSnapshot.self, from: bodyData) else { return }
 
+        // Write validated data to cache
+        do {
+            try bodyData.write(to: Self.cacheURL, options: [.atomic])
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Self.cacheURL.path)
+        } catch {
+            print("[UsageStore] Cache write error: \(error)")
+        }
+
+        Task { @MainActor in
+            // Use a local to avoid capturing self in a non-sendable way
+            let snapshot = decoded
             Task { @MainActor [weak self] in
-                self?.snapshot = decoded
+                self?.snapshot = snapshot
                 self?.lastRefreshDate = Date()
             }
         }
