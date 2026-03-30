@@ -4,6 +4,20 @@ A macOS menu bar app + Chrome extension that shows your Claude.ai usage at a gla
 
 ![Menu Bar](https://img.shields.io/badge/macOS-Menu_Bar_App-blue) ![Chrome Extension](https://img.shields.io/badge/Chrome-MV3_Extension-green) ![Swift](https://img.shields.io/badge/Swift-6-orange)
 
+## Screenshots
+
+<p align="center">
+  <img src="assets/menubar.jpg" alt="Menu bar" width="300">
+  <br>
+  <em>Usage bar + percentage + reset countdown in the menu bar</em>
+</p>
+
+<p align="center">
+  <img src="assets/popover.jpg" alt="Popover" width="320">
+  <br>
+  <em>Click to see full usage breakdown</em>
+</p>
+
 ## What it does
 
 - Shows a **progress bar + percentage** in your macOS menu bar (e.g. `2h40m ████░░ 65%`)
