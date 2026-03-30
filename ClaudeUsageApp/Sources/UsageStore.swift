@@ -61,11 +61,28 @@ final class UsageStore: ObservableObject {
         }
     }
 
+    private var lastDataReceived: Date = Date()
+
     private func scheduleTimer() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: refreshInterval.seconds, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.refresh()
+                guard let self else { return }
+                self.refresh()
+
+                // If no fresh data in 2x the refresh interval, open the usage page
+                // in Chrome so the extension can scrape it
+                let staleThreshold = self.refreshInterval.seconds * 2 + 30
+                if Date().timeIntervalSince(self.lastDataReceived) > staleThreshold {
+                    let chromeURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.Chrome")
+                    if let chromeURL {
+                        let config = NSWorkspace.OpenConfiguration()
+                        config.activates = false // don't bring Chrome to front
+                        NSWorkspace.shared.open([UsageFormatters.usageURL], withApplicationAt: chromeURL, configuration: config)
+                    } else {
+                        NSWorkspace.shared.open(UsageFormatters.usageURL)
+                    }
+                }
             }
         }
     }
@@ -145,13 +162,10 @@ final class UsageStore: ObservableObject {
             print("[UsageStore] Cache write error: \(error)")
         }
 
-        Task { @MainActor in
-            // Use a local to avoid capturing self in a non-sendable way
-            let snapshot = decoded
-            Task { @MainActor [weak self] in
-                self?.snapshot = snapshot
-                self?.lastRefreshDate = Date()
-            }
+        Task { @MainActor [weak self] in
+            self?.snapshot = decoded
+            self?.lastRefreshDate = Date()
+            self?.lastDataReceived = Date()
         }
     }
 }
